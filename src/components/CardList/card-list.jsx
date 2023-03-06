@@ -151,19 +151,12 @@ export class CardList extends Component {
    */
   remapUrl(link) {
     const { type } = link;
-    let { url, appContext } = link;
-    appContext = appContext || 'default';
-
-    const links = this.props.launchLinks;
-
+    let { url } = link;
     if (type === 'smart') {
-      if (links && links[url] && links[url][appContext]) {
-        url = links[url][appContext];
-      } else {
-        url = null;
-      }
+      url = `${url}?iss=https%3A%2F%2Flaunch.smarthealthit.org%2Fv%2Fr4%2Ffhir&launch=WzAsIiIsImZkN2E3MzdlLTFhYzUtNGM0ZS04OWNkLTFjMDdkYTRjYTFjMiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMV0`;
+    } else {
+      url = null;
     }
-
     return url;
   }
 
