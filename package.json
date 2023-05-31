@@ -28,7 +28,7 @@
   "bugs": {
     "url": "https://github.com/cds-hooks/sandbox/issues"
   },
-  "homepage": "https://github.com/cds-hooks/sandbox#readme",
+  "homepage": "./",
   "keywords": [
     "cds",
     "hooks",
