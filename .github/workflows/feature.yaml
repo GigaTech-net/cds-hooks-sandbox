@@ -33,6 +33,7 @@ jobs:
         id: init
         run: terraform init
         working-directory: ./infrastructure
+      
       - name: Install packages
         run: npm ci
 
@@ -40,7 +41,7 @@ jobs:
         run: npm run set-env-dev-mj
 
       - name: Build project
-        run: npm run build-dev
+        run: npm run build-dev-mj
 
       - name: Prepare environment
         run: |
