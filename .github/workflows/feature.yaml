@@ -1,0 +1,62 @@
+name: feature branch build
+
+on:
+  push:
+    branches:
+      - '*'
+      - '!master'
+      - '!development'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: unit test application
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.4.6
+          terraform_wrapper: false # Necessary to access output
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ./infrastructure
+      - name: Install packages
+        run: npm ci
+
+      - name: setup env
+        run: npm run set-env-dev-mj
+
+      - name: Build project
+        run: npm run build-dev
+
+      - name: Prepare environment
+        run: |
+          cp nginx.conf.dev nginx.conf
+          cp .env.dev .env
+          cat .env \
+          | sed "s/AWS_REGION/region/g" \
+          | sed "s/AWS_EXECUTION_ROLE_ARN/execution_role_arn/g" \
+          | sed "s/AWS_TASK_ROLE_ARN/task_role_arn/g" \
+          | sed "s/AWS_ECS_SERVICE_NAME/ecs_service_name/g" \
+          | sed "s/AWS_TASK_DEFINITION_NAME/task_definition_name/g" \
+          | sed "s/AWS_FAMILY/family/g" \
+          | sed "s/AWS_CONTAINER_NAME/container_name/g" \
+          | sed "s/AWS_ENV/env/g" \
+          | sed "s/APP_BASE_URL/app_base_url/g" \
+          > infrastructure/var.tfvars
+          cat infrastructure/var.tfvars
+
+      - name: Generate ECS Task Definition
+        id: apply-partial
+        run: terraform apply -auto-approve -target=template_dir.task_definition -var-file "var.tfvars"
+        working-directory: ./infrastructure
