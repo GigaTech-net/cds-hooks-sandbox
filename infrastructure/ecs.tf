@@ -10,7 +10,6 @@ resource "template_dir" "task_definition" {
     task_definition_name     = var.task_definition_name
     family                   = var.family
     container_name           = var.container_name
-    is_production            = var.is_production
     docker_image_url         = ""
     cpu                      = 512
     memory                   = 1024
