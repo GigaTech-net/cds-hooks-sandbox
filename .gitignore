@@ -35,3 +35,10 @@ npm-debug.log
 *.swp
 
 aggregated-translations
+
+.env
+nginx.conf
+
+/build/*
+!/build/.well-known
+!/build/.nojekyll

@@ -1,0 +1,28 @@
+server {
+    listen      8080;
+    server_name localhost;
+
+    # Define the root directory where your Angular app is deployed
+    root /usr/share/nginx/html;
+    absolute_redirect off;
+
+    location = /health {
+        default_type text/json;
+        return 200 "{status: 'ok'}";
+    }
+
+    location = /cds-hooks-sandbox/health {
+        default_type text/json;
+        return 200 "{status: 'ok'}";
+    }
+
+    # Redirect any other requests to the index.html file
+    location /cds-hooks-sandbox/ {
+       try_files $uri $uri/ /cds-hooks-sandbox/index.html; # 404 if not present
+    }
+
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+}

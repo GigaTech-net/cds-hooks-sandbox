@@ -1,0 +1,117 @@
+name: dev deploy to fargate - mj sandbox
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    name: build app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_IDENTITY_REGION }}
+          role-to-assume: ${{ secrets.AWS_MJSBX_CICD_ROLE }}
+          role-external-id: ${{ secrets.AWS_MJSBX_CICD_EXTERNAL_ID }}
+          role-duration-seconds: 900
+          role-session-name: cds-hooks-sandbox-dev-container-update
+          role-skip-session-tagging: true
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 2.7.18
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.4.6
+          terraform_wrapper: false # Necessary to access output
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ./infrastructure
+
+      - name: Install packages
+        run: npm ci
+
+      - name: Prepare environment
+        run: |
+          cp nginx.conf.dev nginx.conf
+          cp .env.dev.mj .env
+          cat .env \
+          | sed "s/AWS_REGION/region/g" \
+          | sed "s/AWS_EXECUTION_ROLE_ARN/execution_role_arn/g" \
+          | sed "s/AWS_TASK_ROLE_ARN/task_role_arn/g" \
+          | sed "s/AWS_ECS_SERVICE_NAME/ecs_service_name/g" \
+          | sed "s/AWS_TASK_DEFINITION_NAME/task_definition_name/g" \
+          | sed "s/AWS_FAMILY/family/g" \
+          | sed "s/AWS_CONTAINER_NAME/container_name/g" \
+          | sed "s/AWS_ENV/env/g" \
+          | sed "s/IS_PRODUCTION/is_production/g" \
+          | sed "s/APP_BASE_URL/app_base_url/g" \
+          > infrastructure/var.tfvars
+          cat infrastructure/var.tfvars
+
+      - name: Generate ECS Task Definition
+        id: apply-partial
+        run: terraform apply -auto-approve -target=template_dir.task_definition -var-file "var.tfvars"
+        working-directory: ./infrastructure
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ secrets.MJSBX_AWS_ACCOUNT }}.dkr.ecr.${{ secrets.MJSBX_ECR_REGION }}.amazonaws.com
+          ECR_REPOSITORY: cds-hooks-sandbox
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build --build-arg ENV=dev-mj --build-arg APP_BASE_URL=/cds-hooks-sandbox-dev/ -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG . 
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.extract_branch.outputs.branch }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.extract_branch.outputs.branch }}
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        working-directory: .
+
+      - name: Fill in the new image ID in the Amazon ECS task definition ✒
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ./infrastructure/rendered/task-definition.json
+          container-name: cds-hooks-sandbox-dev-ecs-svc-name
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: debug some stuff
+        run: |
+          echo ${{ steps.build-image.outputs.image }}
+          cat ${{ steps.task-def.outputs.task-definition }}
+
+      - name: Deploy Amazon ECS task definition 🚀
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: cds-hooks-sandbox-dev-ecs-svc-name
+          cluster: prometheus-cluster-dev
+          wait-for-service-stability: false
