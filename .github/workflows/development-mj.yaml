@@ -35,6 +35,11 @@ jobs:
         with:
           node-version: 14
 
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 2.7.18
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
@@ -48,9 +53,6 @@ jobs:
 
       - name: Install packages
         run: npm ci
-
-      - name: setup env
-        run: npm run set-env-dev-mj
 
       - name: Prepare environment
         run: |

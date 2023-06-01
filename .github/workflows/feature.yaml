@@ -42,9 +42,6 @@ jobs:
       - name: Install packages
         run: npm ci
 
-      - name: setup env
-        run: npm run set-env-dev-mj
-
       - name: Build project
         run: npm run build-dev-mj
 
