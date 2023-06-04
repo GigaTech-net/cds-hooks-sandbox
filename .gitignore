@@ -42,3 +42,4 @@ nginx.conf
 /build/*
 !/build/.well-known
 !/build/.nojekyll
+.DS_Store

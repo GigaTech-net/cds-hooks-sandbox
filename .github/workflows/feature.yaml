@@ -9,6 +9,8 @@ on:
       - '!development'
       - '!Development'
       - '!test'
+    paths-ignore:
+      - '.github/**'
 
 jobs:
   run:
